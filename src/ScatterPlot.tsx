@@ -1,10 +1,8 @@
 import { useRef, useEffect, useState } from 'react';
 import * as d3 from 'd3';
-import { parseData } from './utils'; // Assuming DataPoint is also exported or accessible
+import { parseData } from './utils';
 import { rawData } from './data';
 
-// Import DataPoint type if it's in utils.ts
-// If DataPoint is not exported from utils.ts, you might need to define it here or import it
 interface DataPoint {
   x: number;
   y: number;
@@ -61,7 +59,7 @@ const ScatterPlot = () => {
     chart.append('g')
       .call(d3.axisLeft(yScale));
 
-    // Line for y=0 if it's in the scale's domain (useful for bar charts)
+    // Line for y=0 if it's in the scale's domain (for bar charts)
     const yZero = yScale.domain()[0] < 0 && yScale.domain()[1] > 0 ? yScale(0) : null;
     if (yZero !== null && currentVisType === 'bar') {
         chart.append('line')
@@ -144,10 +142,6 @@ const ScatterPlot = () => {
         .y1(d => yScale(d.y))
         .curve(d3.curveBasis);
 
-      // If data can go below zero, adjust y0 to yScale(0) or handle negative areas
-      // For simplicity, this example fills from bottom of chart to the line.
-      // A more robust area chart might need separate areas for positive/negative values or set y0 to yScale(0).
-      // Let's adjust y0 to be yScale(0) if 0 is in domain, otherwise chartHeight.
       const yZeroForArea = (yScale.domain()[0] <= 0 && yScale.domain()[1] >= 0) ? yScale(0) : chartHeight;
 
       const adjustedAreaGenerator = d3.area<DataPoint>()
@@ -162,7 +156,7 @@ const ScatterPlot = () => {
         .attr('opacity', 0.7)
         .attr('d', adjustedAreaGenerator);
 
-      // Optionally, draw points for area chart (similar to line chart)
+      //draw points for area chart
       chart.selectAll('.dot')
         .data(currentData)
         .join('circle')
@@ -186,7 +180,7 @@ const ScatterPlot = () => {
         });
     }
 
-  }, [currentExp, currentData, currentVisType]); // Added currentData and currentVisType to dependencies
+  }, [currentExp, currentData, currentVisType]);
 
   const buttonStyle = (isActive: boolean) => ({
     marginRight: '8px',
