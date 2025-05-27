@@ -20,38 +20,38 @@ const ScatterPlot = () => {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [currentExp, setCurrentExp] = useState(0);
-  const [currentVisType, setCurrentVisType] = useState<VisualizationType>('line'); // Default to line chart
+  const [currentVisType, setCurrentVisType] = useState<VisualizationType>('line');
+  const [isAnimating, setIsAnimating] = useState(false); // New state for animation
+  const [animationSpeed, setAnimationSpeed] = useState(1000); // New state for animation speed (ms)
 
   // Data processing
   const experiments: DataPoint[][] = parseData(rawData);
-  const currentData: DataPoint[] = experiments[currentExp] || []; // Ensure currentData is not undefined
+  const currentData: DataPoint[] = experiments[currentExp] || [];
 
+  // Effect for drawing the chart
   useEffect(() => {
     if (!svgRef.current || !currentData || currentData.length === 0) return;
 
     const svg = d3.select(svgRef.current);
-    svg.selectAll('*').remove(); // Clear previous elements
+    svg.selectAll('*').remove();
 
     const chartWidth = WIDTH - MARGIN.left - MARGIN.right;
     const chartHeight = HEIGHT - MARGIN.top - MARGIN.bottom;
 
-    // Create main container
     const chart = svg
       .attr('width', WIDTH)
       .attr('height', HEIGHT)
       .append('g')
       .attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
 
-    // Create scales
     const xScale = d3.scaleLinear()
       .domain(d3.extent(currentData, d => d.x) as [number, number])
       .range([0, chartWidth]);
 
     const yScale = d3.scaleLinear()
-      .domain(d3.extent(experiments.flat(), d => d.y) as [number, number]) // Global Y extent for consistency
+      .domain(d3.extent(experiments.flat(), d => d.y) as [number, number])
       .range([chartHeight, 0]);
 
-    // Draw axes
     chart.append('g')
       .attr('transform', `translate(0,${chartHeight})`)
       .call(d3.axisBottom(xScale));
@@ -59,7 +59,6 @@ const ScatterPlot = () => {
     chart.append('g')
       .call(d3.axisLeft(yScale));
 
-    // Line for y=0 if it's in the scale's domain (for bar charts)
     const yZero = yScale.domain()[0] < 0 && yScale.domain()[1] > 0 ? yScale(0) : null;
     if (yZero !== null && currentVisType === 'bar') {
         chart.append('line')
@@ -71,10 +70,7 @@ const ScatterPlot = () => {
             .attr('stroke-dasharray', '2,2');
     }
 
-
-    // Visualization specific drawing
     if (currentVisType === 'line') {
-      // Draw line
       const lineGenerator = d3.line<DataPoint>()
         .x(d => xScale(d.x))
         .y(d => yScale(d.y))
@@ -87,7 +83,6 @@ const ScatterPlot = () => {
         .attr('stroke-width', 2)
         .attr('d', lineGenerator);
 
-      // Draw points for line chart
       chart.selectAll('.dot')
         .data(currentData)
         .join('circle')
@@ -110,7 +105,7 @@ const ScatterPlot = () => {
         });
 
     } else if (currentVisType === 'bar') {
-      const barWidth = chartWidth / currentData.length * 0.8; // 80% of available space per bar
+      const barWidth = chartWidth / currentData.length * 0.8;
 
       chart.selectAll('.bar')
         .data(currentData)
@@ -119,8 +114,8 @@ const ScatterPlot = () => {
         .attr('x', d => xScale(d.x) - barWidth / 2)
         .attr('y', d => d.y >= 0 ? yScale(d.y) : (yZero ?? yScale.range()[0]))
         .attr('width', barWidth)
-        .attr('height', d => Math.abs(yScale(d.y) - (yZero ?? yScale(0)))) // Use yZero if available, else map 0
-        .attr('fill', '#4682b4') // A different color for bars
+        .attr('height', d => Math.abs(yScale(d.y) - (yZero ?? yScale(0))))
+        .attr('fill', '#4682b4')
         .on('mouseover', (event, d) => {
           if (!tooltipRef.current) return;
           d3.select(tooltipRef.current)
@@ -135,13 +130,6 @@ const ScatterPlot = () => {
         });
 
     } else if (currentVisType === 'area') {
-      // Draw area
-      const areaGenerator = d3.area<DataPoint>()
-        .x(d => xScale(d.x))
-        .y0(chartHeight) // Baseline of the area at the bottom of the chart
-        .y1(d => yScale(d.y))
-        .curve(d3.curveBasis);
-
       const yZeroForArea = (yScale.domain()[0] <= 0 && yScale.domain()[1] >= 0) ? yScale(0) : chartHeight;
 
       const adjustedAreaGenerator = d3.area<DataPoint>()
@@ -152,18 +140,17 @@ const ScatterPlot = () => {
 
       chart.append('path')
         .datum(currentData)
-        .attr('fill', '#ff7f0e') // A different color for area
+        .attr('fill', '#ff7f0e')
         .attr('opacity', 0.7)
         .attr('d', adjustedAreaGenerator);
 
-      //draw points for area chart
       chart.selectAll('.dot')
         .data(currentData)
         .join('circle')
         .attr('class', 'dot')
         .attr('cx', d => xScale(d.x))
         .attr('cy', d => yScale(d.y))
-        .attr('r', 4) // Slightly smaller or different style
+        .attr('r', 4)
         .attr('fill', '#ff7f0e')
         .attr('stroke', '#fff')
         .on('mouseover', (event, d) => {
@@ -182,9 +169,26 @@ const ScatterPlot = () => {
 
   }, [currentExp, currentData, currentVisType]);
 
+  // Effect for animation
+  useEffect(() => {
+    let interval: NodeJS.Timeout | undefined;
+
+    if (isAnimating) {
+      interval = setInterval(() => {
+        setCurrentExp(prevExp => (prevExp + 1) % experiments.length);
+      }, animationSpeed);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isAnimating, experiments.length, animationSpeed]);
+
   const buttonStyle = (isActive: boolean) => ({
     marginRight: '8px',
-    marginBottom: '5px', // Added for spacing between button rows
+    marginBottom: '5px',
     backgroundColor: isActive ? '#555' : '#fff',
     color: isActive ? '#fff' : '#333',
     border: '1px solid #555',
@@ -201,12 +205,34 @@ const ScatterPlot = () => {
         {[0, 1, 2, 3, 4].map(num => (
           <button
             key={`exp-${num}`}
-            onClick={() => setCurrentExp(num)}
+            onClick={() => {
+              setCurrentExp(num);
+              setIsAnimating(false); // Stop animation if manual selection
+            }}
             style={buttonStyle(currentExp === num)}
           >
             Experiment {num + 1}
           </button>
         ))}
+        <button
+          onClick={() => setIsAnimating(!isAnimating)}
+          style={{ ...buttonStyle(isAnimating), backgroundColor: isAnimating ? '#d9534f' : '#5cb85c', borderColor: isAnimating ? '#d43f3a' : '#4cae4c', color: '#fff' }}
+        >
+          {isAnimating ? 'Stop Animation' : 'Start Animation'}
+        </button>
+      </div>
+
+      {/* Animation speed control */}
+      <div style={{ marginBottom: 10 }}>
+        <strong>Animation Speed (ms):</strong>
+        <input
+          type="number"
+          value={animationSpeed}
+          onChange={(e) => setAnimationSpeed(Number(e.target.value))}
+          min="100"
+          step="100"
+          style={{ marginLeft: '8px', padding: '6px', borderRadius: '4px', border: '1px solid #ccc' }}
+        />
       </div>
 
       {/* Visualization type controls */}
